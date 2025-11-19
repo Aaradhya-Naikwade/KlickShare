@@ -15,7 +15,7 @@ let isConnected = false;
 
 export default async function connectMongo() {
   if (isConnected) {
-    console.log("✅ MongoDB already connected");
+    console.log("MongoDB already connected");
     return;
   }
 
@@ -28,8 +28,8 @@ export default async function connectMongo() {
 
     isConnected = db.connections[0].readyState === 1;
 
-    console.log("🚀 MongoDB Connected Successfully to klickshare-demo");
+    console.log("MongoDB Connected Successfully to klickshare");
   } catch (error) {
-    console.error("❌ MongoDB Connection Error:", error);
+    console.error("MongoDB Connection Error:", error);
   }
 }

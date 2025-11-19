@@ -32,7 +32,8 @@ export default function Sidebar({ title, links }: SidebarProps) {
         if (!userId) return;
 
         // Get notifications
-        const res = await fetch(`/api/notifications?userId=${userId}`);
+        const res = 
+        await fetch(`/api/notifications?userId=${userId}`);
         const data = await res.json();
 
         if (res.ok && data.notifications) {
