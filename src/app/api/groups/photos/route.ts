@@ -162,11 +162,15 @@ export async function POST(req: Request) {
       ];
       if (!allowed.includes(file.type)) continue;
 
-      const sizeLimit = 20 * 1024 * 1024;
+      const sizeLimit = 100 * 1024 * 1024;
       if (file.size > sizeLimit) continue;
 
       const fd = new FormData();
-      fd.append("file", file);
+      const bytes = await file.arrayBuffer();
+const buffer = Buffer.from(bytes);
+
+fd.append("file", new Blob([buffer]), file.name);
+
       fd.append("event_id", group.event.toString()); // ✅ ADD
       fd.append("group_id", groupId);
       fd.append("photographer_id", photographerId);
