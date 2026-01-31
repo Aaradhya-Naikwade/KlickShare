@@ -256,11 +256,13 @@ import Group from "@/models/Group";
 import User from "@/models/User";
 import Notification from "@/models/Notification";
 
-export const runtime = "nodejs"; // ✅ Required for Mongoose
+export const runtime = "nodejs"; // Required for Node APIs
 
 const PYTHON_API = process.env.PYTHON_FACE_API || "http://127.0.0.1:8000";
 
 export async function POST(req: Request) {
+  console.log("POST /api/groups/upload called");
+
   try {
     await connectMongo();
 
@@ -270,87 +272,54 @@ export async function POST(req: Request) {
     const photographerId = form.get("photographerId") as string | null;
     const files = form.getAll("photos") as File[];
 
-    if (!groupId) {
-      return NextResponse.json({ message: "groupId is required" }, { status: 400 });
-    }
+    if (!groupId) return NextResponse.json({ message: "groupId required" }, { status: 400 });
+    if (!photographerId) return NextResponse.json({ message: "photographerId required" }, { status: 400 });
+    if (!files || files.length === 0) return NextResponse.json({ message: "No files uploaded" }, { status: 400 });
 
-    if (!photographerId) {
-      return NextResponse.json({ message: "photographerId is required" }, { status: 400 });
-    }
-
-    if (!files || files.length === 0) {
-      return NextResponse.json({ message: "No files uploaded" }, { status: 400 });
-    }
-
-    // Find group and populate members
     const group = await Group.findById(groupId).populate("members.user", "_id");
-    if (!group) {
-      return NextResponse.json({ message: "Group not found" }, { status: 404 });
-    }
+    if (!group) return NextResponse.json({ message: "Group not found" }, { status: 404 });
 
     const uploadedUrls: string[] = [];
 
-    // -----------------------------
-    // Forward each file to Python API
-    // -----------------------------
     for (const file of files) {
-      if (!file || !file.name) continue;
+      if (!file?.name) continue;
 
       const allowed = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
       if (!allowed.includes(file.type)) continue;
 
-      const sizeLimit = 100 * 1024 * 1024; // 100MB
-      if (file.size > sizeLimit) continue;
+      if (file.size > 100 * 1024 * 1024) continue; // 100MB limit
 
       const fd = new FormData();
-
-      // ✅ Node-safe Blob
-      const bytes = await file.arrayBuffer(); // ArrayBuffer
+      const bytes = await file.arrayBuffer();
       fd.append("file", new Blob([bytes], { type: file.type }), file.name);
 
       fd.append("event_id", group.event.toString());
       fd.append("group_id", groupId);
       fd.append("photographer_id", photographerId);
 
-      // Send to Python API
       const res = await fetch(`${PYTHON_API}/add-face`, { method: "POST", body: fd });
-
       const text = await res.text();
       let data: any;
+
       try {
         data = JSON.parse(text);
       } catch {
         throw new Error(`Python API returned non-JSON: ${text}`);
       }
 
-      if (!res.ok) {
-        throw new Error(data?.detail || `Python error: ${res.status}`);
-      }
+      if (!res.ok) throw new Error(data?.detail || `Python error: ${res.status}`);
 
       uploadedUrls.push(data.s3_url);
     }
 
-    if (uploadedUrls.length === 0) {
-      return NextResponse.json({ message: "No valid files uploaded" }, { status: 400 });
-    }
+    if (uploadedUrls.length === 0) return NextResponse.json({ message: "No valid files uploaded" }, { status: 400 });
 
-    // -----------------------------
-    // Save S3 URLs to group
-    // -----------------------------
-    await Group.findByIdAndUpdate(groupId, {
-      $push: { photos: { $each: uploadedUrls } },
-    });
+    await Group.findByIdAndUpdate(groupId, { $push: { photos: { $each: uploadedUrls } } });
 
-    // -----------------------------
-    // Create notifications
-    // -----------------------------
+    // Notify members
     try {
-      const memberObjs = group.members || [];
-      const memberIds = memberObjs.map((m: any) =>
-        m.user ? String(m.user._id || m.user) : String(m)
-      );
-
-      const notifications = memberIds.map((mid: string) => ({
+      const memberIds = (group.members || []).map(m => String(m.user?._id || m.user));
+      const notifications = memberIds.map(mid => ({
         user: mid,
         title: `New photos in "${group.name}"`,
         body: `${uploadedUrls.length} new photo(s) uploaded.`,
@@ -360,12 +329,9 @@ export async function POST(req: Request) {
         createdAt: new Date(),
         updatedAt: new Date(),
       }));
-
-      if (notifications.length > 0) {
-        await Notification.insertMany(notifications);
-      }
-    } catch (nerr) {
-      console.warn("Notification create error:", nerr);
+      if (notifications.length > 0) await Notification.insertMany(notifications);
+    } catch (err) {
+      console.warn("Notification create error:", err);
     }
 
     return NextResponse.json({ message: "Files uploaded", files: uploadedUrls }, { status: 200 });
