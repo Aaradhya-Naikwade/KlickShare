@@ -441,7 +441,7 @@ export default function FaceSearch() {
                     {group.name}
                   </h4>
                   <p className="text-xs text-gray-500">
-                    Group ID: <span className="font-medium">{groupId}</span>
+                    {/* Group ID: <span className="font-medium">{groupId}</span> */}
                   </p>
                 </div>
 
@@ -473,9 +473,9 @@ export default function FaceSearch() {
                           />
 
                           {/* Similarity Badge */}
-                          <div className="absolute top-2 left-2 rounded-full bg-black/60 text-white text-[11px] px-2.5 py-1">
+                          {/* <div className="absolute top-2 left-2 rounded-full bg-black/60 text-white text-[11px] px-2.5 py-1">
                             {percent}%
-                          </div>
+                          </div> */}
 
                           {/* Bottom Gradient */}
                           <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition" />

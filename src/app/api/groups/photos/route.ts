@@ -167,6 +167,7 @@ export async function POST(req: Request) {
 
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("event_id", group.event.toString()); // ✅ ADD
       fd.append("group_id", groupId);
       fd.append("photographer_id", photographerId);
 

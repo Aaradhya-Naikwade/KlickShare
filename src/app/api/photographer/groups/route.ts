@@ -1,42 +1,229 @@
+// import { NextResponse } from "next/server";
+// import connectMongo from "@/lib/mongodb";
+// import User from "@/models/User";
+// import Group from "@/models/Group";
+
+// import multer from "multer";
+// import path from "path";
+// import { promisify } from "util";
+
+// const storage = multer.diskStorage({
+//   destination: function (req, file, cb) {
+//     cb(null, "public/uploads/groups");
+//   },
+//   filename: function (req, file, cb) {
+//     const ext = path.extname(file.originalname);
+//     const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+//     cb(null, unique + ext);
+//   },
+// });
+
+// const upload = multer({
+//   storage,
+//   limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+// });
+
+// const runMiddleware = promisify(upload.single("coverPhoto"));
+
+// // ------- POST - CREATE GROUP -------
+// export async function POST(req: Request) {
+//   try {
+//     await connectMongo();
+
+//     // FormData read
+//     const form = await req.formData();
+
+//     const name = form.get("name") as string;
+//     const description = form.get("description") as string;
+//     const isPublic = form.get("isPublic") === "true";
+//     const phone = form.get("phone") as string;
+
+//     if (!name || !phone) {
+//       return NextResponse.json(
+//         { message: "Group name & phone are required." },
+//         { status: 400 }
+//       );
+//     }
+
+//     // find photographer
+//     const photographer = await User.findOne({ phone });
+//     if (!photographer) {
+//       return NextResponse.json(
+//         { message: "Photographer not found." },
+//         { status: 404 }
+//       );
+//     }
+
+//     // Handle cover photo (optional)
+//     let coverPhotoPath = "/default-cover.png";
+
+//     const file = form.get("coverPhoto") as unknown as File;
+//     if (file) {
+//       const buffer = Buffer.from(await file.arrayBuffer());
+//       const ext = path.extname(file.name);
+//       const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+//       const fileName = unique + ext;
+//       const uploadPath = `public/uploads/groups/${fileName}`;
+
+//       // Save file manually
+//       const fs = require("fs");
+//       fs.writeFileSync(uploadPath, buffer);
+
+//       coverPhotoPath = `/uploads/groups/${fileName}`;
+//     }
+
+//     // create group
+//     const newGroup = await Group.create({
+//       name,
+//       description,
+//       isPublic,
+//       createdBy: photographer._id,
+//       coverPhoto: coverPhotoPath,
+//     });
+
+//     return NextResponse.json(
+//       {
+//         message: "Group created successfully",
+//         group: newGroup,
+//       },
+//       { status: 200 }
+//     );
+//   } catch (error: any) {
+//     console.error("Group Create Error:", error);
+//     return NextResponse.json(
+//       { message: "Internal Server Error", error: error.message },
+//       { status: 500 }
+//     );
+//   }
+// }
+
+// // ------- GET - FETCH ALL GROUPS -------
+// export async function GET(req: Request) {
+//   try {
+//     await connectMongo();
+   
+//     const { searchParams } = new URL(req.url);
+//     const phone = searchParams.get("phone");
+
+//     if (!phone) {
+//       return NextResponse.json(
+//         { message: "Phone number required" },
+//         { status: 400 }
+//       );
+//     }
+
+//     const photographer = await User.findOne({ phone });
+
+//     if (!photographer) {
+//       return NextResponse.json(
+//         { message: "Photographer not found" },
+//         { status: 404 }
+//       );
+//     }
+
+//     const groups = await Group.find({ createdBy: photographer._id })
+//       .populate("members", "_id name")
+//       .lean();
+
+//     return NextResponse.json({ groups }, { status: 200 });
+//   } catch (error: any) {
+//     console.error("Fetch Groups Error:", error);
+//     return NextResponse.json(
+//       { message: "Internal Server Error", error: error.message },
+//       { status: 500 }
+//     );
+//   }
+// }
+    
+// // ------- DELETE GROUP -------
+// export async function DELETE(req: Request) {
+//   try {
+//     await connectMongo();
+
+//     const { searchParams } = new URL(req.url);
+//     const id = searchParams.get("id");
+
+//     if (!id) {
+//       return NextResponse.json(
+//         { message: "Group ID is required" },
+//         { status: 400 }
+//       );
+//     }
+
+//     const group = await Group.findById(id);
+
+//     if (!group) {
+//       return NextResponse.json(
+//         { message: "Group not found" },
+//         { status: 404 }
+//       );
+//     }
+
+//     await Group.findByIdAndDelete(id);
+
+//     return NextResponse.json(
+//       { message: "Group Deleted Successfully" },
+//       { status: 200 }
+//     );
+//   } catch (error: any) {
+//     console.error("Delete Group Error:", error);
+//     return NextResponse.json(
+//       { message: "Internal Server Error", error: error.message },
+//       { status: 500 }
+//     );
+//   }  
+// }
+
+
+
+
+
+
+
 import { NextResponse } from "next/server";
 import connectMongo from "@/lib/mongodb";
 import User from "@/models/User";
 import Group from "@/models/Group";
-
-import multer from "multer";
+import Event from "@/models/Event";
 import path from "path";
-import { promisify } from "util";
+import fs from "fs";
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "public/uploads/groups");
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, unique + ext);
-  },
-});
+// ----------------------------------------------------
+// helper → get or create Default Event
+// ----------------------------------------------------
+async function getDefaultEvent(photographerId: string) {
+  let event = await Event.findOne({
+    createdBy: photographerId,
+    name: "Default Event",
+  });
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
-});
+  if (!event) {
+    event = await Event.create({
+      name: "Default Event",
+      description: "Auto-created default event",
+      createdBy: photographerId,
+    });
+  }
 
-const runMiddleware = promisify(upload.single("coverPhoto"));
+  return event;
+}
 
-// ------- POST - CREATE GROUP -------
+// ----------------------------------------------------
+// POST → Create Group (Event-aware)
+// ----------------------------------------------------
 export async function POST(req: Request) {
   try {
     await connectMongo();
 
-    // FormData read
     const form = await req.formData();
 
     const name = form.get("name") as string;
     const description = form.get("description") as string;
     const isPublic = form.get("isPublic") === "true";
     const phone = form.get("phone") as string;
+
+    // ✅ optional (new)
+    const eventId = form.get("eventId") as string | null;
 
     if (!name || !phone) {
       return NextResponse.json(
@@ -45,7 +232,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // find photographer
     const photographer = await User.findOne({ phone });
     if (!photographer) {
       return NextResponse.json(
@@ -54,38 +240,65 @@ export async function POST(req: Request) {
       );
     }
 
-    // Handle cover photo (optional)
-    let coverPhotoPath = "/default-cover.png";
+    // ------------------------------------------------
+    // EVENT RESOLUTION (new + backward compatible)
+    // ------------------------------------------------
+    let event;
 
+    if (eventId) {
+      event = await Event.findById(eventId);
+      if (!event) {
+        return NextResponse.json(
+          { message: "Event not found" },
+          { status: 404 }
+        );
+      }
+    } else {
+      // 🔒 fallback for old UI
+      event = await getDefaultEvent(String(photographer._id));
+    }
+
+    // ------------------------------------------------
+    // COVER PHOTO
+    // ------------------------------------------------
+    let coverPhotoPath = "/default-cover.png";
     const file = form.get("coverPhoto") as unknown as File;
-    if (file) {
+
+    if (file && file.size > 0) {
       const buffer = Buffer.from(await file.arrayBuffer());
       const ext = path.extname(file.name);
       const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
       const fileName = unique + ext;
-      const uploadPath = `public/uploads/groups/${fileName}`;
 
-      // Save file manually
-      const fs = require("fs");
-      fs.writeFileSync(uploadPath, buffer);
+      const uploadDir = path.join(
+        process.cwd(),
+        "public",
+        "uploads",
+        "groups"
+      );
 
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+
+      fs.writeFileSync(path.join(uploadDir, fileName), buffer);
       coverPhotoPath = `/uploads/groups/${fileName}`;
     }
 
-    // create group
+    // ------------------------------------------------
+    // CREATE GROUP
+    // ------------------------------------------------
     const newGroup = await Group.create({
       name,
       description,
       isPublic,
       createdBy: photographer._id,
+      event: event._id, // ✅ IMPORTANT
       coverPhoto: coverPhotoPath,
     });
 
     return NextResponse.json(
-      {
-        message: "Group created successfully",
-        group: newGroup,
-      },
+      { message: "Group created successfully", group: newGroup },
       { status: 200 }
     );
   } catch (error: any) {
@@ -97,13 +310,16 @@ export async function POST(req: Request) {
   }
 }
 
-// ------- GET - FETCH ALL GROUPS -------
+// ----------------------------------------------------
+// GET → Fetch Groups (by event OR fallback)
+// ----------------------------------------------------
 export async function GET(req: Request) {
   try {
     await connectMongo();
-   
+
     const { searchParams } = new URL(req.url);
     const phone = searchParams.get("phone");
+    const eventId = searchParams.get("eventId");
 
     if (!phone) {
       return NextResponse.json(
@@ -113,7 +329,6 @@ export async function GET(req: Request) {
     }
 
     const photographer = await User.findOne({ phone });
-
     if (!photographer) {
       return NextResponse.json(
         { message: "Photographer not found" },
@@ -121,8 +336,14 @@ export async function GET(req: Request) {
       );
     }
 
-    const groups = await Group.find({ createdBy: photographer._id })
-      .populate("members", "_id name")
+    let filter: any = { createdBy: photographer._id };
+
+    if (eventId) {
+      filter.event = eventId;
+    }
+
+    const groups = await Group.find(filter)
+      .populate("members.user", "_id name")
       .lean();
 
     return NextResponse.json({ groups }, { status: 200 });
@@ -134,8 +355,10 @@ export async function GET(req: Request) {
     );
   }
 }
-    
-// ------- DELETE GROUP -------
+
+// ----------------------------------------------------
+// DELETE → Delete Group (unchanged)
+// ----------------------------------------------------
 export async function DELETE(req: Request) {
   try {
     await connectMongo();
@@ -151,7 +374,6 @@ export async function DELETE(req: Request) {
     }
 
     const group = await Group.findById(id);
-
     if (!group) {
       return NextResponse.json(
         { message: "Group not found" },
@@ -171,5 +393,5 @@ export async function DELETE(req: Request) {
       { message: "Internal Server Error", error: error.message },
       { status: 500 }
     );
-  }  
+  }
 }
