@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -13,13 +12,13 @@ export default function SelectRolePage() {
     const verifiedMobile = sessionStorage.getItem("verifiedMobile");
     if (!verifiedMobile) {
       toast.error("Please verify your mobile number first");
-      router.push("/signup");
+      router.replace("/auth"); // history-safe redirect
     } else setMobile(verifiedMobile);
   }, [router]);
 
   const handleSelect = (role: "viewer" | "photographer") => {
-    if (role === "viewer") router.push("/signup/user");
-    else router.push("/signup/photographer");
+    if (role === "viewer") router.replace("/signup/user");
+    else router.replace("/signup/photographer");
   };
 
   return (
@@ -55,7 +54,7 @@ export default function SelectRolePage() {
         <p className="text-sm text-gray-500 mt-6">
           Not you?{" "}
           <span
-            onClick={() => router.push("/signup")}
+            onClick={() => router.replace("/auth")}
             className="text-[#1f6563] font-semibold cursor-pointer"
           >
             Go back

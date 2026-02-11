@@ -48,10 +48,10 @@ export async function GET(req: Request) {
       );
     }
 
-    // ✅ Populate EVENT so frontend can group by it
+    // Populate EVENT so frontend can group by it
     const groups = await Group.find({ "members.user": userId })
       .populate("createdBy", "name phone")
-      .populate("event", "name") // 🔥 THIS IS THE KEY LINE
+      .populate("event", "name") 
       .lean();
 
     return NextResponse.json({ groups }, { status: 200 });

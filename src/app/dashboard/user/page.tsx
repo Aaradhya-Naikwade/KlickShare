@@ -15,7 +15,7 @@ export default function ViewerDashboard() {
     const [activeTab, setActiveTab] = useState("profile");
     const [isClient, setIsClient] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
-
+    
     useEffect(() => {
         setIsClient(true);
 

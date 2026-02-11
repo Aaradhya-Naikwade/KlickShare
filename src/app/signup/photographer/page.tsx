@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -16,7 +15,7 @@ export default function PhotographerSignup() {
     const verifiedMobile = sessionStorage.getItem("verifiedMobile");
     if (!verifiedMobile) {
       toast.error("Verify mobile first");
-      router.push("/signup");
+      router.replace("/auth"); // history-safe redirect
     } else setMobile(verifiedMobile);
   }, [router]);
 
@@ -30,7 +29,13 @@ export default function PhotographerSignup() {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, companyName, phone: mobile, role: "photographer" }),
+        body: JSON.stringify({
+          name,
+          email,
+          companyName,
+          phone: mobile,
+          role: "photographer",
+        }),
       });
 
       const data = await res.json();
@@ -38,7 +43,7 @@ export default function PhotographerSignup() {
         localStorage.setItem("userId", data.user._id);
         localStorage.setItem("verifiedMobile", data.user.phone);
         toast.success("Signup successful!");
-        router.push("/dashboard/photographer");
+        router.replace("/dashboard/photographer"); // history-safe redirect
       } else toast.error(data.message || "Signup failed");
     } catch (err) {
       console.error(err);
