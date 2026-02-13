@@ -1,6 +1,9 @@
+
+
+
 // "use client";
 
-// import { useState } from "react";
+// import { useEffect, useState } from "react";
 // import { useRouter } from "next/navigation";
 // import toast from "react-hot-toast";
 
@@ -10,6 +13,32 @@
 //   const [otp, setOtp] = useState("");
 //   const [isOtpSent, setIsOtpSent] = useState(false);
 
+//   // ----------------------------
+//   // 1️⃣ Redirect already logged-in users
+//   // ----------------------------
+//   useEffect(() => {
+//     const userId = localStorage.getItem("userId");
+//     const verifiedMobile = localStorage.getItem("verifiedMobile");
+
+//     if (userId && verifiedMobile) {
+//       // Fetch role from backend
+//       fetch(`/api/auth/profile?phone=${verifiedMobile}`)
+//         .then(res => res.json())
+//         .then(data => {
+//           if (data.user?.role === "viewer") router.replace("/dashboard/user");
+//           else if (data.user?.role === "photographer") router.replace("/dashboard/photographer");
+//           // else router.replace("/admin/dashboard");
+//         })
+//         .catch(err => console.error(err));
+//     }
+
+//     // Optional: prevent back button cache issues
+//     window.history.replaceState({}, document.title);
+//   }, [router]);
+
+//   // ----------------------------
+//   // 2️⃣ Send OTP
+//   // ----------------------------
 //   const handleSendOtp = async () => {
 //     if (mobile.trim().length !== 10) {
 //       toast.error("Enter a valid 10-digit mobile number");
@@ -36,6 +65,9 @@
 //     }
 //   };
 
+//   // ----------------------------
+//   // 3️⃣ Verify OTP
+//   // ----------------------------
 //   const handleVerifyOtp = async () => {
 //     if (!otp || otp.length !== 4) {
 //       toast.error("Enter 4-digit OTP");
@@ -51,7 +83,7 @@
 
 //       const data = await res.json();
 //       if (res.ok) {
-//         // Check if user is already registered
+//         // Check if user already exists
 //         const userRes = await fetch(`/api/auth/login`, {
 //           method: "POST",
 //           headers: { "Content-Type": "application/json" },
@@ -66,13 +98,13 @@
 
 //           toast.success("Login successful!");
 
-//           if (userData.role === "viewer") router.push("/dashboard/user");
-//           else if (userData.role === "photographer") router.push("/dashboard/photographer");
-//           else router.push("/admin/dashboard");
+//           if (userData.role === "viewer") router.replace("/dashboard/user");
+//           else if (userData.role === "photographer") router.replace("/dashboard/photographer");
+//           else router.replace("/admin/dashboard");
 //         } else {
 //           // New user → go to select role
 //           sessionStorage.setItem("verifiedMobile", mobile);
-//           router.push("/signup/select-role");
+//           router.replace("/signup/select-role");
 //         }
 //       } else {
 //         toast.error(data.message || "OTP verification failed");
@@ -83,6 +115,9 @@
 //     }
 //   };
 
+//   // ----------------------------
+//   // 4️⃣ Render
+//   // ----------------------------
 //   return (
 //     <div className="min-h-screen flex items-center justify-center bg-[#e0f2f1]">
 //       <div className="bg-white rounded-xl shadow-lg p-8 w-[90%] max-w-md text-center">
@@ -143,10 +178,6 @@
 
 
 
-
-
-
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -155,119 +186,177 @@ import toast from "react-hot-toast";
 
 export default function AuthPage() {
   const router = useRouter();
+
   const [mobile, setMobile] = useState("");
   const [otp, setOtp] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
 
-  // ----------------------------
-  // 1️⃣ Redirect already logged-in users
-  // ----------------------------
+  // ============================
+  // Redirect already logged-in users
+  // ============================
   useEffect(() => {
     const userId = localStorage.getItem("userId");
     const verifiedMobile = localStorage.getItem("verifiedMobile");
 
     if (userId && verifiedMobile) {
-      // Fetch role from backend
       fetch(`/api/auth/profile?phone=${verifiedMobile}`)
         .then(res => res.json())
         .then(data => {
-          if (data.user?.role === "viewer") router.replace("/dashboard/user");
-          else if (data.user?.role === "photographer") router.replace("/dashboard/photographer");
-          else router.replace("/admin/dashboard");
+          if (!data.success) return;
+
+          if (data.user.role === "viewer")
+            router.replace("/dashboard/user");
+
+          else if (data.user.role === "photographer")
+            router.replace("/dashboard/photographer");
         })
-        .catch(err => console.error(err));
+        .catch(console.error);
     }
 
-    // Optional: prevent back button cache issues
     window.history.replaceState({}, document.title);
+
   }, [router]);
 
-  // ----------------------------
-  // 2️⃣ Send OTP
-  // ----------------------------
+
+
+  // ============================
+  // Send OTP
+  // ============================
   const handleSendOtp = async () => {
-    if (mobile.trim().length !== 10) {
-      toast.error("Enter a valid 10-digit mobile number");
+
+    if (mobile.length !== 10) {
+      toast.error("Enter valid mobile number");
       return;
     }
 
     try {
+
       const res = await fetch("/api/auth/send-otp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: mobile }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          phone: mobile
+        })
       });
 
       const data = await res.json();
+
       if (res.ok) {
-        toast.success(data.message);
+        toast.success("OTP sent");
         setIsOtpSent(true);
       } else {
-        toast.error(data.message || "Failed to send OTP");
+        toast.error(data.message);
       }
-    } catch (err) {
-      console.error(err);
+
+    } catch {
       toast.error("Server error");
     }
   };
 
-  // ----------------------------
-  // 3️⃣ Verify OTP
-  // ----------------------------
+
+
+  // ============================
+  // Verify OTP
+  // ============================
   const handleVerifyOtp = async () => {
-    if (!otp || otp.length !== 4) {
-      toast.error("Enter 4-digit OTP");
+
+    if (otp.length !== 4) {
+      toast.error("Enter valid OTP");
       return;
     }
 
     try {
-      const res = await fetch("/api/auth/verify-otp", {
+
+      // verify OTP
+      const otpRes = await fetch("/api/auth/verify-otp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: mobile, otp }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          phone: mobile,
+          otp
+        })
       });
 
-      const data = await res.json();
-      if (res.ok) {
-        // Check if user already exists
-        const userRes = await fetch(`/api/auth/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: mobile }),
-        });
+      const otpData = await otpRes.json();
 
-        const userData = await userRes.json();
-        if (userRes.ok && userData.role) {
-          // Already registered → go to dashboard
-          localStorage.setItem("userId", userData.userId);
-          localStorage.setItem("verifiedMobile", userData.phone);
-
-          toast.success("Login successful!");
-
-          if (userData.role === "viewer") router.replace("/dashboard/user");
-          else if (userData.role === "photographer") router.replace("/dashboard/photographer");
-          else router.replace("/admin/dashboard");
-        } else {
-          // New user → go to select role
-          sessionStorage.setItem("verifiedMobile", mobile);
-          router.replace("/signup/select-role");
-        }
-      } else {
-        toast.error(data.message || "OTP verification failed");
+      if (!otpRes.ok) {
+        toast.error(otpData.message);
+        return;
       }
-    } catch (err) {
-      console.error(err);
+
+
+      // check user exists or not
+      const authRes = await fetch("/api/auth/authenticate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          phone: mobile
+        })
+      });
+
+      const authData = await authRes.json();
+
+
+      if (!authData.success) {
+        toast.error(authData.message);
+        return;
+      }
+
+
+      // EXISTING USER
+      if (!authData.isNewUser) {
+
+        localStorage.setItem("userId", authData.user.id);
+        localStorage.setItem("verifiedMobile", authData.user.phone);
+
+        toast.success("Login successful");
+
+
+        if (authData.user.role === "viewer") {
+          router.replace("/dashboard/user");
+        }
+
+        else if (authData.user.role === "photographer") {
+          router.replace("/dashboard/photographer");
+        }
+
+        return;
+      }
+
+
+      // NEW USER
+      sessionStorage.setItem("verifiedMobile", mobile);
+
+      toast.success("Mobile verified");
+
+      router.replace("/signup/select-role");
+
+
+    } catch {
       toast.error("Server error");
     }
   };
 
-  // ----------------------------
-  // 4️⃣ Render
-  // ----------------------------
+
+
+  // ============================
+  // UI
+  // ============================
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#e0f2f1]">
+
       <div className="bg-white rounded-xl shadow-lg p-8 w-[90%] max-w-md text-center">
-        <h1 className="text-2xl font-semibold text-[#1f6563] mb-6">🔐 Login / Signup</h1>
+
+        <h1 className="text-2xl font-semibold text-[#1f6563] mb-6">
+          Login / Signup
+        </h1>
+
 
         {!isOtpSent && (
           <>
@@ -278,14 +367,17 @@ export default function AuthPage() {
               onChange={(e) => setMobile(e.target.value)}
               className="w-full border p-3 rounded-lg mb-4 text-center"
             />
+
             <button
               onClick={handleSendOtp}
-              className="w-full bg-[#1f6563] text-white py-3 rounded-lg hover:bg-[#15514f] transition"
+              className="w-full bg-[#1f6563] text-white py-3 rounded-lg"
             >
               Send OTP
             </button>
           </>
         )}
+
+
 
         {isOtpSent && (
           <>
@@ -296,24 +388,18 @@ export default function AuthPage() {
               onChange={(e) => setOtp(e.target.value)}
               className="w-full border p-3 rounded-lg mb-4 text-center"
             />
+
             <button
               onClick={handleVerifyOtp}
-              className="w-full bg-[#1f6563] text-white py-3 rounded-lg hover:bg-[#15514f] transition"
+              className="w-full bg-[#1f6563] text-white py-3 rounded-lg"
             >
               Verify OTP
             </button>
-            <p className="text-sm text-gray-500 mt-4">
-              Didn’t receive OTP?{" "}
-              <span
-                className="text-[#1f6563] font-semibold cursor-pointer"
-                onClick={handleSendOtp}
-              >
-                Resend
-              </span>
-            </p>
           </>
         )}
+
       </div>
+
     </div>
   );
 }

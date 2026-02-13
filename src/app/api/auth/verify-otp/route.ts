@@ -100,7 +100,7 @@ export async function POST(req: Request) {
           : "/dashboard/photographer"
         : "/signup/select-role",
     };
-
+    
     const response = NextResponse.json(responseData, { status: 200 });
 
     // Set cookie
